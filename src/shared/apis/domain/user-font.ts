@@ -1,0 +1,160 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { END_POINT } from '../config/end-point';
+import { instance } from '../instance';
+import { queryKey } from '../keys/query-key';
+import type { ApiResponse } from '../types/api-response';
+import type {
+  ComparedFont,
+  CompareFontPreviewResponse,
+  CompareFontPreviewType,
+  CompareResult,
+  CompareStateRequest,
+  LikedFont,
+  LikedFontResult,
+  LikeStateRequest,
+} from '../types/user-font';
+
+const userId = 1;
+
+/**
+ * 폰트 비교하기 상태 변경
+ */
+const postCompare = async (fontId: number, request: CompareStateRequest) => {
+  const response = await instance.post<ApiResponse<null>>(
+    END_POINT.COMPARE_STATE_CHANGE(fontId),
+    request,
+    {
+      headers: {
+        userId: userId,
+      },
+    },
+  );
+  return response.data;
+};
+export const usePostCompare = () => {
+  return useMutation({
+    mutationFn: ({
+      fontId,
+      request,
+    }: {
+      fontId: number;
+      request: CompareStateRequest;
+    }) => postCompare(fontId, request),
+  });
+};
+
+/**
+ * 폰트 좋아요 상태 변경
+ */
+const postLike = async (fontId: number, request: LikeStateRequest) => {
+  const response = await instance.post<ApiResponse<null>>(
+    END_POINT.LIKE_STATE_CHANGE(fontId),
+    request,
+    {
+      headers: {
+        userId: userId,
+      },
+    },
+  );
+  return response.data;
+};
+export const usePostLike = () => {
+  return useMutation({
+    mutationFn: ({
+      fontId,
+      request,
+    }: {
+      fontId: number;
+      request: LikeStateRequest;
+    }) => postLike(fontId, request),
+  });
+};
+
+/**
+ * 좋아요한 폰트 목록 조회
+ */
+const getLiked = async (): Promise<LikedFont[]> => {
+  const response = await instance.get<ApiResponse<LikedFontResult>>(
+    END_POINT.LIKED_FONT,
+    {
+      headers: { userId: String(userId) },
+    },
+  );
+  const likedFonts = response.data.result;
+  if (!likedFonts) {
+    return [];
+  }
+  return likedFonts.items;
+};
+
+export const useGetLiked = () => {
+  return useQuery({
+    queryKey: [queryKey.GET_LIKED_FONTS, userId],
+    queryFn: () => getLiked(),
+    refetchOnMount: 'always',
+  });
+};
+/**
+ * 비교하기에 담긴 폰트 목록 조회
+ */
+const getCompare = async (): Promise<ComparedFont[]> => {
+  const response = await instance.get<ApiResponse<CompareResult>>(
+    END_POINT.COMPARE_FONT,
+    {
+      headers: { userId: userId },
+    },
+  );
+  return response.data.result.items;
+};
+export const useGetCompare = () => {
+  return useQuery({
+    queryKey: [queryKey.GET_COMPARE, userId],
+    queryFn: () => getCompare(),
+    refetchOnMount: 'always',
+  });
+};
+
+/**
+ * 모든 폰트 비교 상태 해제 API
+ */
+const compareResetAll = async (fontIds: number[]) => {
+  const requests = fontIds.map((id) => postCompare(id, { isCompared: false }));
+  return Promise.all(requests);
+};
+export const useCompareResetAll = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fontIds: number[]) => compareResetAll(fontIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [queryKey.GET_COMPARE, userId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [queryKey.GET_FONTS],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [queryKey.GET_COMPARE_FONT_PREVIEW, userId],
+      });
+    },
+  });
+};
+
+/**
+ * 폰트 비교하기 플로팅 버튼 조회
+ */
+const getComparedFontPreview = async (): Promise<CompareFontPreviewType[]> => {
+  const response = await instance.get<ApiResponse<CompareFontPreviewResponse>>(
+    END_POINT.COMPARE_FONT_BUTTON,
+    { headers: { userId: String(userId) } },
+  );
+  return response.data.result.items;
+};
+
+export const useGetComparePreview = () => {
+  return useQuery({
+    queryKey: [queryKey.GET_COMPARE_FONT_PREVIEW, userId],
+    queryFn: () => getComparedFontPreview(),
+  });
+};
