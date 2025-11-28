@@ -16,7 +16,7 @@ const CompareFloatingButton = ({
   if (isEmpty) {
     return (
       <button className={styles.emptyButton} disabled>
-        폰트 탐색 중~
+        비교하기
       </button>
     );
   }
